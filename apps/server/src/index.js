@@ -7,7 +7,7 @@ import { registerUser, loginUser, saveMatch, getHistoryForUser } from "./db.js";
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: "*" } // TODO: restringir en producción
+  cors: { origin: process.env.CORS_ORIGIN || "*" } // "*" en local; restringido en producción vía Railway
 });
 
 // Mapa de salas: code -> { players: [{socketId, user_id, name, role}], gameState: object }

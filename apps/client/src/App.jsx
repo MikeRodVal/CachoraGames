@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import AuthScreen from "./AuthScreen.jsx";
-import GameScreen from "./GameScreen.jsx";
+import Lobby from "./Lobby.jsx";
 import HistoryScreen from "./HistoryScreen.jsx";
 
 export default function App() {
@@ -49,7 +49,7 @@ export default function App() {
             onClick={() => setView(view === "game" ? "history" : "game")}
             style={{ padding: "8px 12px", cursor: "pointer", backgroundColor: "#f0f0f0", border: "1px solid #ccc", borderRadius: "4px" }}
           >
-            {view === "game" ? "Ver historial" : "Volver al juego"}
+            {view === "game" ? "Ver historial" : "Volver al lobby"}
           </button>
           <button
             onClick={handleLogout}
@@ -62,7 +62,7 @@ export default function App() {
 
       <main>
         {view === "game" ? (
-          <GameScreen user={user} />
+          <Lobby user={user} onLeave={() => setView("game")} />
         ) : (
           <HistoryScreen user={user} />
         )}

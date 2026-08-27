@@ -5,12 +5,11 @@ App web de mini juegos multijugador (empezando con sopa de letras) para que Luis
 y su pareja jueguen juntos desde el celular. Usa WebSockets en vez de apps nativas
 para evitar el proceso de revisión de App Store.
 
-## Stack
+## Arquitectura
 - Monorepo con npm workspaces
-- apps/server: Node.js + Express + Socket.io
-- apps/client: React + Vite, mobile-first
-- Estado del juego vive en el servidor (fuente de verdad), se transmite por eventos socket
-- Base de Datos: Supabase (PostgreSQL) para persistencia de usuarios e historial de partidas
+- Sala persistente: Manejada por `Lobby.jsx`. Una vez unida la pareja, eligen juego desde el lobby (`select_game`) y el juego se renderiza dinámicamente (`GameScreen` o `SopaLetrasScreen`).
+- Permite cambiar de juego sin salir de la sala.
+- Estado del juego vive en el servidor (fuente de verdad), se transmite por eventos socket.
 
 ## Base de Datos (Supabase)
 ### Conexión
@@ -49,6 +48,8 @@ La base de datos está alojada en Supabase. Para conectar desde el servidor, se 
 - [x] Pantalla de login/registro en cliente con persistencia
 - [x] Lógica de salas (crear/unirse) completa en cliente
 - [x] Primer juego: Ahorcado completo
+- [x] Segundo juego: Sopa de Letras completo
+- [x] Tercer juego: Crucigrama completo
 - [x] Historial de partidas y estadísticas (backend + frontend)
 - [x] Roles alternados y funcionalidad de salir de sala
 - [x] Persistencia de la palabra en historial de partidas

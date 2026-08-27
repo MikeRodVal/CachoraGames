@@ -3,6 +3,8 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { nanoid } from "nanoid";
 import { registerUser, loginUser, saveMatch, getHistoryForUser } from "./db.js";
+import { generateGrid } from "./gameUtils.js";
+import { generateCrossword } from "./crosswordUtils.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -14,6 +16,7 @@ const io = new Server(httpServer, {
 const rooms = new Map();
 
 io.on("connection", (socket) => {
+
   // Eventos de Autenticación / Registro
   socket.on("register", async (payload, callback) => {
     if (!payload || typeof callback !== "function") return;
@@ -34,7 +37,8 @@ io.on("connection", (socket) => {
     const code = nanoid(5).toUpperCase();
     rooms.set(code, {
       players: [{ socketId: socket.id, ...user, role: "proposer" }],
-      gameState: null
+      gameState: null,
+      currentGame: null
     });
     socket.join(code);
     callback({ code, role: "proposer" });
@@ -42,7 +46,9 @@ io.on("connection", (socket) => {
 
   socket.on("join_room", ({ code, user }, callback) => {
     const room = rooms.get(code);
-    if (!room) return callback({ error: "Sala no encontrada" });
+    if (!room) {
+      return callback({ error: "Sala no encontrada" });
+    }
     if (room.players.length >= 2) return callback({ error: "Sala llena" });
 
     const newPlayer = { socketId: socket.id, ...user, role: "guesser" };
@@ -50,11 +56,18 @@ io.on("connection", (socket) => {
     socket.join(code);
     callback({ ok: true, role: "guesser" });
 
-    // Avisamos a ambos que la sala ya está completa, cada quien recibe el nombre DEL OTRO
     room.players.forEach((p) => {
       const opponent = room.players.find((pl) => pl.socketId !== p.socketId);
       io.to(p.socketId).emit("opponent_joined", { name: opponent.name });
     });
+  });
+
+  socket.on("select_game", ({ code, gameType }) => {
+    const room = rooms.get(code);
+    if (!room) return;
+    room.currentGame = gameType;
+    room.gameState = null;
+    io.to(code).emit("game_selected", { gameType });
   });
 
   // Eventos de Juego
@@ -111,7 +124,6 @@ io.on("connection", (socket) => {
           guessed: false
       });
 
-      // Guardar partida
       await saveMatch({
         game_type: 'ahorcado',
         player1_id: proposerId,
@@ -121,7 +133,6 @@ io.on("connection", (socket) => {
         winner_id: proposerId
       });
 
-      // Invertir roles y resetear para la siguiente ronda
       room.players.forEach(p => {
           p.role = p.role === "proposer" ? "guesser" : "proposer";
           io.to(p.socketId).emit("roles_swapped", { role: p.role });
@@ -139,7 +150,6 @@ io.on("connection", (socket) => {
           guessed: true
       });
 
-      // Guardar partida
       await saveMatch({
         game_type: 'ahorcado',
         player1_id: proposerId,
@@ -149,7 +159,6 @@ io.on("connection", (socket) => {
         winner_id: guesserId
       });
 
-      // Invertir roles y resetear para la siguiente ronda
       room.players.forEach(p => {
           p.role = p.role === "proposer" ? "guesser" : "proposer";
           io.to(p.socketId).emit("roles_swapped", { role: p.role });
@@ -160,28 +169,165 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("leave_room", ({ code }) => {
+  // Eventos de Sopa de Letras
+  socket.on("start_sopa_round", ({ code, game_type }) => {
     const room = rooms.get(code);
     if (!room) return;
 
-    room.players = room.players.filter(p => p.socketId !== socket.id);
-    socket.leave(code);
+    const words = ["CACHORA", "AMOR", "JUEGO", "SOPA", "LETRAS", "REACT", "NODE", "SOCKET", "GATO", "PERRO", "PLAYA", "SOL", "LUNA", "ESTRELLA", "NUBE"].sort(() => 0.5 - Math.random()).slice(0, 10);
+    const { grid, placedWords } = generateGrid(words);
 
-    if (room.players.length === 0) {
-      rooms.delete(code);
-    } else {
-      io.to(code).emit("player_left", { name: "Un jugador ha salido" });
+    room.gameState = {
+      type: "sopa_letras",
+      grid,
+      words: placedWords.map(p => ({ word: p.word, foundBy: null })),
+      status: "playing",
+      timer: 120
+    };
+
+    io.to(code).emit("sopa_started", { grid, words: room.gameState.words, timer: 60 });
+
+    const interval = setInterval(() => {
+      if (!rooms.has(code) || !rooms.get(code).gameState) {
+        clearInterval(interval);
+        return;
+      }
+      room.gameState.timer--;
+      if (room.gameState.timer <= 0) {
+        clearInterval(interval);
+        endSopaRound(code);
+      }
+    }, 1000);
+  });
+
+  socket.on("submit_word_selection", ({ code, coordinates }) => {
+    const room = rooms.get(code);
+    if (!room || !room.gameState || room.gameState.type !== "sopa_letras") return;
+
+    const selectedLetters = coordinates.map(c => room.gameState.grid[c.row][c.col]).join("");
+    const wordIndex = room.gameState.words.findIndex(w => (w.word === selectedLetters || w.word === selectedLetters.split("").reverse().join("")) && !w.foundBy);
+
+    if (wordIndex !== -1) {
+      const player = room.players.find(p => p.socketId === socket.id);
+      room.gameState.words[wordIndex].foundBy = player.name;
+      room.gameState.words[wordIndex].userId = player.user_id;
+
+      io.to(code).emit("word_claimed", { word: room.gameState.words[wordIndex].word, player: player.name });
+
+      if (room.gameState.words.every(w => w.foundBy)) {
+        endSopaRound(code);
+      }
     }
   });
+
+  async function endSopaRound(code) {
+    const room = rooms.get(code);
+    if (!room || !room.gameState) return;
+
+    const scores = {};
+    room.players.forEach(p => scores[p.user_id] = 0);
+    room.gameState.words.forEach(w => {
+      if (w.foundBy) {
+        scores[w.userId] = (scores[w.userId] || 0) + (w.word.length * 10);
+      }
+    });
+
+    const winnerId = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+
+    await saveMatch({
+      game_type: 'sopa_letras',
+      player1_id: room.players[0].user_id,
+      player2_id: room.players[1].user_id,
+      score1: scores[room.players[0].user_id],
+      score2: scores[room.players[1].user_id],
+      winner_id: winnerId
+    });
+
+    io.to(code).emit("sopa_round_over", { scores, winnerId });
+    room.gameState = null;
+  }
 
   socket.on("get_history", async ({ user_id }, callback) => {
     const history = await getHistoryForUser(user_id);
     callback(history);
   });
 
-  socket.on("disconnect", () => {
-    // TODO: Limpiar salas
+  // Eventos de Crucigrama
+  socket.on("start_crucigrama_round", ({ code }) => {
+    const room = rooms.get(code);
+    if (!room) return;
+
+    const { grid, placedWords } = generateCrossword();
+    room.gameState = {
+      type: "crucigrama",
+      grid,
+      words: placedWords.map(w => ({ ...w, foundBy: null })),
+      status: "playing"
+    };
+
+    io.to(code).emit("crucigrama_started", { 
+        grid: grid.map(r => r.map(c => c ? { char: c.char, revealed: false } : null)), 
+        pistas: placedWords.map(w => ({ number: w.number, clue: w.clue })) 
+    });
   });
+
+  socket.on("submit_crossword_answer", ({ code, number, answer }) => {
+    const room = rooms.get(code);
+    if (!room || !room.gameState || room.gameState.type !== "crucigrama") return;
+
+    const wordObj = room.gameState.words.find(w => w.number === number && !w.foundBy);
+    if (wordObj && wordObj.word === answer.toUpperCase()) {
+      const player = room.players.find(p => p.socketId === socket.id);
+      wordObj.foundBy = player.name;
+      wordObj.userId = player.user_id;
+
+      // Actualizar grid
+      wordObj.word.split("").forEach((char, i) => {
+        const r = wordObj.isHorizontal ? wordObj.row : wordObj.row + i;
+        const c = wordObj.isHorizontal ? wordObj.col + i : wordObj.col;
+        room.gameState.grid[r][c].revealed = true;
+      });
+
+      io.to(code).emit("clue_solved", { 
+          number, 
+          word: wordObj.word, 
+          player: player.name,
+          grid: room.gameState.grid
+      });
+
+      if (room.gameState.words.every(w => w.foundBy)) {
+        endCrosswordRound(code);
+      }
+    }
+  });
+
+  async function endCrosswordRound(code) {
+    const room = rooms.get(code);
+    if (!room || !room.gameState) return;
+
+    const scores = {};
+    room.players.forEach(p => scores[p.user_id] = 0);
+    room.gameState.words.forEach(w => {
+      if (w.foundBy) {
+        scores[w.userId] = (scores[w.userId] || 0) + (w.word.length * 10);
+      }
+    });
+
+    const winnerId = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+
+    await saveMatch({
+      game_type: 'crucigrama',
+      player1_id: room.players[0].user_id,
+      player2_id: room.players[1].user_id,
+      score1: scores[room.players[0].user_id],
+      score2: scores[room.players[1].user_id],
+      winner_id: winnerId
+    });
+
+    io.to(code).emit("crucigrama_round_over", { scores, winnerId });
+    room.gameState = null;
+  }
+
 });
 
 const PORT = process.env.PORT || 3001;

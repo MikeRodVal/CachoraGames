@@ -267,7 +267,7 @@ io.on("connection", (socket) => {
 
     io.to(code).emit("crucigrama_started", { 
         grid: grid.map(r => r.map(c => c ? { char: c.char, revealed: false } : null)), 
-        pistas: placedWords.map(w => ({ number: w.number, clue: w.clue })) 
+        pistas: placedWords.map(w => ({ number: w.number, clue: w.clue, length: w.word.length })) 
     });
   });
 
@@ -292,7 +292,8 @@ io.on("connection", (socket) => {
           number, 
           word: wordObj.word, 
           player: player.name,
-          grid: room.gameState.grid
+          grid: room.gameState.grid,
+          pistas: room.gameState.words.map(w => ({ number: w.number, clue: w.clue, foundBy: w.foundBy, length: w.word.length }))
       });
 
       if (room.gameState.words.every(w => w.foundBy)) {

@@ -58,6 +58,13 @@ export default function Lobby({ user, onLeave }) {
 
   const leaveRoom = () => {
     if (roomCode) socket.emit("leave_room", { code: roomCode });
+    setRoomCode(null);
+    setRole(null);
+    setOpponentName(null);
+    setOpponentJoined(false);
+    setGameType(null);
+    setJoinCodeInput("");
+    setJoinError(null);
     onLeave();
   };
 

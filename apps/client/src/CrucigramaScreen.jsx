@@ -10,7 +10,7 @@ export default function CrucigramaScreen({ user, roomCode, opponentName, onBackT
   useEffect(() => {
     socket.emit("start_crucigrama_round", { code: roomCode });
     socket.on("crucigrama_started", (data) => { setGrid(data.grid); setPistas(data.pistas); });
-    socket.on("clue_solved", (data) => { setGrid(data.grid); });
+    socket.on("clue_solved", (data) => { setGrid(data.grid); setPistas(data.pistas); });
     socket.on("crucigrama_round_over", (data) => setResults(data));
     return () => { socket.off("crucigrama_started"); socket.off("clue_solved"); socket.off("crucigrama_round_over"); };
   }, [roomCode]);
@@ -34,24 +34,35 @@ export default function CrucigramaScreen({ user, roomCode, opponentName, onBackT
   return (
     <div>
       <p>Sala: {roomCode} | Oponente: {opponentName}</p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 25px)", marginBottom: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(13, 25px)", marginBottom: "20px" }}>
         {grid.map((row, r) => row.map((cell, c) => (
-          <div key={`${r}-${c}`} style={{ width: "25px", height: "25px", border: "1px solid #000", background: cell ? (cell.revealed ? "#fff" : "#000") : "#ddd" }}>
+          <div key={`${r}-${c}`} style={{ width: "25px", height: "25px", border: "1px solid #000", background: cell ? (cell.revealed ? "#fff" : "#eee") : "#000" }}>
             {cell?.revealed ? cell.char : ""}
           </div>
         )))}
       </div>
-      <div>
-        {pistas.map(p => (
-          <div key={p.number} style={{ marginBottom: "10px" }}>
-            {p.number}. {p.clue}
-            <input value={answerInputs[p.number] || ""} onChange={(e) => setAnswerInputs(prev => ({ ...prev, [p.number]: e.target.value }))} />
-            <button onClick={() => submitAnswer(p.number)}>Responder</button>
-          </div>
-        ))}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+        {pistas.map(p => {
+          const isSolved = !!pistas.find(pista => pista.number === p.number)?.foundBy;
+          return (
+            <div key={p.number} style={{ marginBottom: "10px", border: "1px solid #ccc", padding: "5px" }}>
+              <strong>{p.number}.</strong> {p.clue} <span style={{ fontSize: "12px", color: "#666" }}>({p.length} letras)</span>
+              <br />
+              <input 
+                value={answerInputs[p.number] || ""} 
+                onChange={(e) => setAnswerInputs(prev => ({ ...prev, [p.number]: e.target.value }))}
+                disabled={isSolved}
+              />
+              <button 
+                onClick={() => submitAnswer(p.number)}
+                disabled={isSolved}
+              >Responder</button>
+            </div>
+          );
+        })}
       </div>
-      <button onClick={onBackToLobby}>Cambiar de juego</button>
-      <button onClick={onLeaveRoom}>Salir de sala</button>
+      <button onClick={onBackToLobby} style={{ marginTop: "20px" }}>Cambiar de juego</button>
+      <button onClick={onLeaveRoom} style={{ marginTop: "20px", marginLeft: 8 }}>Salir de sala</button>
     </div>
   );
 }

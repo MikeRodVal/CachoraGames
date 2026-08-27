@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 
-// En una app real, usar un contexto para el socket
-const socket = io("http://localhost:3001");
+// En producción usa VITE_SERVER_URL (definida en Vercel), en desarrollo local usa localhost
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+const socket = io(SERVER_URL);
 
 export default function GameScreen({ user }) {
   const [roomCode, setRoomCode] = useState(null);

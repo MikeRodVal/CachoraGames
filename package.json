@@ -1,0 +1,11 @@
+{
+  "name": "cachora-games",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace=apps/server",
+    "dev:client": "npm run dev --workspace=apps/client"
+  }
+}

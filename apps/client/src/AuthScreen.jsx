@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { io } from "socket.io-client";
-
-const socket = io("http://localhost:3001");
+import { socket } from "./socket.js";
 
 export default function AuthScreen({ onAuthSuccess }) {
   const [isLogin, setIsLogin] = useState(true);

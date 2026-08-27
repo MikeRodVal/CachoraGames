@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
-import { io } from "socket.io-client";
-
-const socket = io("http://localhost:3001");
+import { socket } from "./socket.js";
 
 export default function HistoryScreen({ user }) {
   const [history, setHistory] = useState([]);

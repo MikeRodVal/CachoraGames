@@ -28,14 +28,17 @@ export default function SopaLetrasScreen({ user, roomCode, opponentName, onBackT
     return () => { clearInterval(interval); socket.off("sopa_started"); socket.off("word_claimed"); socket.off("sopa_round_over"); };
   }, [roomCode]);
 
-  const handlePointerDown = (row, col) => setSelection([{ row, col }]);
-  const handlePointerEnter = (row, col) => {
-    if (selection.length > 0) setSelection(prev => [...prev, { row, col }]);
+  const toggleCell = (row, col) => {
+    if (selection.find(s => s.row === row && s.col === col)) return;
+    setSelection(prev => [...prev, { row, col }]);
   };
-  const handlePointerUp = () => {
+
+  const confirmWord = () => {
     socket.emit("submit_word_selection", { code: roomCode, coordinates: selection });
     setSelection([]);
   };
+
+  const clearSelection = () => setSelection([]);
 
   if (results) {
     const myScore = results.scores[user.user_id] ?? 0;
@@ -64,17 +67,19 @@ export default function SopaLetrasScreen({ user, roomCode, opponentName, onBackT
       <p>Tiempo: {timer}s</p>
       <div 
         ref={gridRef}
-        onPointerUp={handlePointerUp}
         style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: "2px", marginBottom: "16px" }}
       >
         {grid.map((row, r) => row.map((char, c) => (
           <div 
             key={`${r}-${c}`}
-            onPointerDown={() => handlePointerDown(r, c)}
-            onPointerEnter={() => handlePointerEnter(r, c)}
+            onClick={() => toggleCell(r, c)}
             style={{ width: "25px", height: "25px", border: "1px solid #ccc", display: "flex", justifyContent: "center", alignItems: "center", cursor: "pointer", background: selection.find(s => s.row === r && s.col === c) ? "#add8e6" : "white" }}
           >{char}</div>
         )))}
+      </div>
+      <div>
+        <button onClick={confirmWord}>Confirmar palabra</button>
+        <button onClick={clearSelection}>Limpiar</button>
       </div>
       <div>
         {words.map(w => (

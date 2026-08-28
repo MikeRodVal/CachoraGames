@@ -48,8 +48,9 @@ La base de datos está alojada en Supabase. Para conectar desde el servidor, se 
 - [x] Pantalla de login/registro en cliente con persistencia
 - [x] Lógica de salas (crear/unirse) completa en cliente
 - [x] Primer juego: Ahorcado completo
-- [x] Segundo juego: Sopa de Letras completo
-- [x] Tercer juego: Crucigrama completo
+- [x] Segundo juego: Sopa de Letras completo (interacción por clics secuenciales)
+- [x] Tercer juego: Crucigrama completo (numeración estándar, generación mejorada con reintentos)
+- [x] Navegación: Lobby persistente y botón 'Salir de Sala' corregido
 - [x] Historial de partidas y estadísticas (backend + frontend)
 - [x] Roles alternados y funcionalidad de salir de sala
 - [x] Persistencia de la palabra en historial de partidas

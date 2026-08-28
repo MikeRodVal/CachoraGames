@@ -1,88 +1,80 @@
 import { crosswordData } from "./crosswordData.js";
 
 export function generateCrossword(size = 13) {
-  const grid = Array(size).fill(null).map(() => Array(size).fill(null));
-  const placedWords = [];
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const grid = Array(size).fill(null).map(() => Array(size).fill(null));
+    const placedWords = [];
+    const candidates = crosswordData.sort(() => 0.5 - Math.random());
 
-  // Shuffle and select candidate words
-  const candidates = crosswordData.sort(() => 0.5 - Math.random());
+    // 1. Place first word
+    const firstWordObj = candidates[0];
+    placeTrueCrossword(grid, firstWordObj.word, Math.floor(size / 2), Math.floor((size - firstWordObj.word.length) / 2), true, 0);
 
-  // 1. Place the first word in the middle
-  const firstWordObj = candidates[0];
-  const firstWord = firstWordObj.word;
-  const startRow = Math.floor(size / 2);
-  const startCol = Math.max(0, Math.floor((size - firstWord.length) / 2));
-  
-  // Place first word horizontally
-  for (let i = 0; i < firstWord.length; i++) {
-    grid[startRow][startCol + i] = { char: firstWord[i], revealed: false, number: 1 };
-  }
-  placedWords.push({
-    ...firstWordObj,
-    row: startRow,
-    col: startCol,
-    isHorizontal: true,
-    number: 1
-  });
+    placedWords.push({ ...firstWordObj, row: Math.floor(size / 2), col: Math.floor((size - firstWordObj.word.length) / 2), isHorizontal: true });
 
-  // 2. Try to place remaining words intersecting with already placed words
-  let currentNumber = 2;
-  for (let k = 1; k < candidates.length; k++) {
-    if (placedWords.length >= 10) break; // Limit to 10 words
+    // 2. Place remaining
+    for (let k = 1; k < candidates.length; k++) {
+      if (placedWords.length >= 10) break;
+      const newWordObj = candidates[k];
+      const newWord = newWordObj.word;
+      let placed = false; // bandera para salir de TODOS los ciclos en cuanto se coloque
 
-    const newWordObj = candidates[k];
-    const newWord = newWordObj.word;
-    let placed = false;
-
-    // Search for intersections with any already placed word
-    for (const placedWord of placedWords) {
-      if (placed) break;
-
-      for (let i = 0; i < placedWord.word.length; i++) {
+      for (const placedWord of placedWords) {
         if (placed) break;
-        const placedChar = placedWord.word[i];
+        for (let i = 0; i < placedWord.word.length; i++) {
+          if (placed) break;
+          const placedChar = placedWord.word[i];
+          for (let j = 0; j < newWord.length; j++) {
+            if (newWord[j] === placedChar) {
+              const isHorizontal = !placedWord.isHorizontal;
+              const newRow = isHorizontal ? placedWord.row + i : placedWord.row - j;
+              const newCol = isHorizontal ? placedWord.col - j : placedWord.col + i;
 
-        for (let j = 0; j < newWord.length; j++) {
-          if (newWord[j] === placedChar) {
-            // Found a common letter at index i in placedWord and index j in newWord
-            const isHorizontal = !placedWord.isHorizontal;
-            
-            // Calculate starting coordinate of newWord
-            let newRow, newCol;
-            if (isHorizontal) {
-              // placedWord is vertical, newWord is horizontal
-              newRow = placedWord.row + i;
-              newCol = placedWord.col - j;
-            } else {
-              // placedWord is horizontal, newWord is vertical
-              newRow = placedWord.row - j;
-              newCol = placedWord.col + i;
-            }
-
-            if (canPlaceTrueCrossword(grid, newWord, newRow, newCol, isHorizontal, size, newRow + (isHorizontal ? 0 : j), newCol + (isHorizontal ? j : 0))) {
-              placeTrueCrossword(grid, newWord, newRow, newCol, isHorizontal, currentNumber);
-              placedWords.push({
-                ...newWordObj,
-                row: newRow,
-                col: newCol,
-                isHorizontal,
-                number: currentNumber
-              });
-              currentNumber++;
-              placed = true;
-              break;
+              if (canPlaceTrueCrossword(grid, newWord, newRow, newCol, isHorizontal, size, newRow + (isHorizontal ? 0 : j), newCol + (isHorizontal ? j : 0))) {
+                placeTrueCrossword(grid, newWord, newRow, newCol, isHorizontal, 0);
+                placedWords.push({ ...newWordObj, row: newRow, col: newCol, isHorizontal });
+                placed = true;
+                break; // sale del "for j"
+              }
             }
           }
         }
       }
     }
-  }
 
-  return { grid, placedWords };
+    if (placedWords.length >= 6) {
+      // 3. Assign standard numbering
+      let numbering = 1;
+      const finalPlacedWords = placedWords.map(w => ({ ...w, number: 0 }));
+
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (!grid[r][c]) continue;
+
+          let startsHorizontal = false;
+          let startsVertical = false;
+
+          if (c === 0 || !grid[r][c - 1]) startsHorizontal = true;
+          if (r === 0 || !grid[r - 1][c]) startsVertical = true;
+
+          if (startsHorizontal || startsVertical) {
+            finalPlacedWords.forEach(w => {
+              if (w.row === r && w.col === c) {
+                w.number = numbering;
+                grid[r][c].number = numbering;
+              }
+            });
+            numbering++;
+          }
+        }
+      }
+      return { grid, placedWords: finalPlacedWords };
+    }
+  }
+  return { grid: [], placedWords: [] };
 }
 
 function canPlaceTrueCrossword(grid, word, startRow, startCol, isHorizontal, size, intersectRow, intersectCol) {
-  // Check bounds
   if (startRow < 0 || startCol < 0) return false;
   if (isHorizontal && startCol + word.length > size) return false;
   if (!isHorizontal && startRow + word.length > size) return false;
@@ -92,32 +84,27 @@ function canPlaceTrueCrossword(grid, word, startRow, startCol, isHorizontal, siz
     const c = isHorizontal ? startCol + i : startCol;
 
     const cell = grid[r][c];
-    // If there is already a letter, it must match the new word's letter
     if (cell && cell.char !== word[i]) {
       return false;
     }
 
-    // Ensure it doesn't run adjacent/parallel to other words or create invalid touchings
-    // (excluding the intersection cell itself)
     if (r !== intersectRow || c !== intersectCol) {
-      if (cell) continue; // matches are allowed
+      if (cell) continue;
 
-      // Check neighbors (perpendicular) to ensure we don't collide/blend with other words
-      const neighbors = isHorizontal 
-        ? [[-1, 0], [1, 0]] 
+      const neighbors = isHorizontal
+        ? [[-1, 0], [1, 0]]
         : [[0, -1], [0, 1]];
 
       for (const [dr, dc] of neighbors) {
         const nr = r + dr;
         const nc = c + dc;
         if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-          if (grid[nr][nc]) return false; // adjacent block is not empty
+          if (grid[nr][nc]) return false;
         }
       }
     }
   }
 
-  // Check the cells immediately before and after the word to ensure there's no spillover
   const beforeRow = isHorizontal ? startRow : startRow - 1;
   const beforeCol = isHorizontal ? startCol - 1 : startCol;
   if (beforeRow >= 0 && beforeRow < size && beforeCol >= 0 && beforeCol < size) {
@@ -137,7 +124,6 @@ function placeTrueCrossword(grid, word, row, col, isHorizontal, number) {
   for (let i = 0; i < word.length; i++) {
     const r = isHorizontal ? row : row + i;
     const c = isHorizontal ? col + i : col;
-    // Keep existing cell definition if it's already there (to preserve shared intersections)
     if (!grid[r][c]) {
       grid[r][c] = { char: word[i], revealed: false, number };
     }

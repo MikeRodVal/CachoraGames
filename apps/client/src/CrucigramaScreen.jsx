@@ -19,15 +19,24 @@ export default function CrucigramaScreen({ user, roomCode, opponentName, onBackT
     socket.emit("submit_crossword_answer", { code: roomCode, number, answer: answerInputs[number] });
   };
 
-  if (results) return (
-    <div>
-      <h2>Resultados</h2>
-      <pre>{JSON.stringify(results, null, 2)}</pre>
-      <button onClick={() => { setResults(null); socket.emit("start_crucigrama_round", { code: roomCode }); }}>Jugar otra ronda</button>
-      <button onClick={onBackToLobby}>Cambiar de juego</button>
-      <button onClick={onLeaveRoom}>Salir de sala</button>
-    </div>
-  );
+  if (results) {
+    const myScore = results.scores[user.user_id] ?? 0;
+    const opponentId = Object.keys(results.scores).find((id) => id !== String(user.user_id));
+    const opponentScore = opponentId ? results.scores[opponentId] ?? 0 : 0;
+    const iWon = String(results.winnerId) === String(user.user_id);
+    const isTie = myScore === opponentScore;
+
+    return (
+      <div>
+        <h2>{isTie ? "¡Empate!" : iWon ? "¡Ganaste!" : `${opponentName} ganó`}</h2>
+        <p>Tú: <strong>{myScore} pts</strong></p>
+        <p>{opponentName}: <strong>{opponentScore} pts</strong></p>
+        <button onClick={() => { setResults(null); socket.emit("start_crucigrama_round", { code: roomCode }); }}>Jugar otra ronda</button>
+        <button onClick={onBackToLobby}>Cambiar de juego</button>
+        <button onClick={onLeaveRoom}>Salir de sala</button>
+      </div>
+    );
+  }
 
   if (!grid) return <div>Cargando...</div>;
 

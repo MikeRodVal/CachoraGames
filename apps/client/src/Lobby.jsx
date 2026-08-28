@@ -105,7 +105,7 @@ export default function Lobby({ user, onLeave }) {
     );
   }
 
-  const commonProps = { user, roomCode, opponentName, onBackToLobby: () => setGameType(null), onLeaveRoom: leaveRoom };
+  const commonProps = { user, roomCode, opponentName, initialRole: role, onBackToLobby: () => setGameType(null), onLeaveRoom: leaveRoom };
   if (gameType === "ahorcado") return <GameScreen {...commonProps} />;
   if (gameType === "sopa_letras") return <SopaLetrasScreen {...commonProps} />;
   return <CrucigramaScreen {...commonProps} />;
